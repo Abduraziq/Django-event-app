@@ -1,3 +1,4 @@
+from betterforms.multiform import MultiModelForm
 from django import forms
 
 

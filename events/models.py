@@ -1,7 +1,7 @@
+from ckeditor_uploader.fields import RichTextUploadingField
 from django.db import models
 from django.urls import reverse
 from mapbox_location_field.models import LocationField
-from ckeditor_uploader.fields import RichTextUploadingField
 
 
 class EventCategory(models.Model):
@@ -13,20 +13,22 @@ class EventCategory(models.Model):
     updated_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='updated_user')
     created_date = models.DateField(auto_now_add=True)
     updated_date = models.DateField(auto_now_add=True)
-    status_choice = (
+    
+    STATUS_CHOICES = (
         ('disabled', 'Disabled'),
         ('active', 'Active'),
         ('deleted', 'Deleted'),
         ('blocked', 'Blocked'),
         ('completed', 'Completed'),
     )
-    status = models.CharField(choices=status_choice, max_length=10)
+    status = models.CharField(choices=STATUS_CHOICES, max_length=10)
 
     def __str__(self):
         return self.name
-    
+
     def get_absolute_url(self):
         return reverse('event-category-list')
+
 
 class JobCategory(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -34,28 +36,33 @@ class JobCategory(models.Model):
     def __str__(self):
         return self.name
 
+
 class Event(models.Model):
     category = models.ForeignKey(EventCategory, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, unique=True)
     uid = models.PositiveIntegerField(unique=True)
     description = RichTextUploadingField()
-    job_category = models.ForeignKey(JobCategory, on_delete=models.CASCADE)
-    select_scheduled_status = (
+    job_category = models.ForeignKey(JobCategory, on_delete=models.CASCADE, null=True, blank=True)
+    
+    SCHEDULED_STATUS_CHOICES = (
         ('yet to scheduled', 'Yet to Scheduled'),
-        ('scheduled', 'Scheduled')
+        ('scheduled', 'Scheduled'),
     )
-    scheduled_status = models.CharField(max_length=25, choices=select_scheduled_status)
+    scheduled_status = models.CharField(max_length=25, choices=SCHEDULED_STATUS_CHOICES)
+
     venue = models.CharField(max_length=255)
     start_date = models.DateField()
     end_date = models.DateField()
     location = LocationField()
     points = models.PositiveIntegerField()
     maximum_attende = models.PositiveIntegerField()
+
     created_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, blank=True, null=True, related_name='event_created_user')
     updated_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, blank=True, null=True, related_name='event_updated_user')
     created_date = models.DateField(auto_now_add=True)
     updated_date = models.DateField(auto_now_add=True)
-    status_choice = (
+
+    STATUS_CHOICES = (
         ('disabled', 'Disabled'),
         ('active', 'Active'),
         ('deleted', 'Deleted'),
@@ -63,20 +70,21 @@ class Event(models.Model):
         ('completed', 'Completed'),
         ('cancel', 'Cancel'),
     )
-    status = models.CharField(choices=status_choice, max_length=10)
+    status = models.CharField(choices=STATUS_CHOICES, max_length=10)
 
     def __str__(self):
         return self.name
-    
+
     def get_absolute_url(self):
         return reverse('event-list')
-    
+
     def created_updated(model, request):
         obj = model.objects.latest('pk')
         if obj.created_by is None:
             obj.created_by = request.user
         obj.updated_by = request.user
         obj.save()
+
 
 class EventImage(models.Model):
     event = models.OneToOneField(Event, on_delete=models.CASCADE)
@@ -93,52 +101,62 @@ class EventAgenda(models.Model):
 
 
 class EventJobCategoryLinking(models.Model):
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    job_category = models.ForeignKey(JobCategory, on_delete=models.CASCADE)
-    status_choice = (
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='job_category_links'
+    )
+    job_category = models.ForeignKey(
+        JobCategory,
+        on_delete=models.CASCADE,
+        related_name='event_links'
+    )
+    STATUS_CHOICES = (
         ('disabled', 'Disabled'),
         ('active', 'Active'),
         ('deleted', 'Deleted'),
         ('blocked', 'Blocked'),
         ('completed', 'Completed'),
     )
-    status = models.CharField(choices=status_choice, max_length=10)
+    status = models.CharField(choices=STATUS_CHOICES, max_length=10)
 
     def __str__(self):
-        return str(self.event)
+        return f"{self.event} - {self.job_category}"
 
 
 class EventMember(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE)
-    attend_status_choice = (
+    
+    ATTEND_STATUS_CHOICES = (
         ('waiting', 'Waiting'),
         ('attending', 'Attending'),
         ('completed', 'Completed'),
         ('absent', 'Absent'),
         ('cancelled', 'Cancelled'),
     )
-    attend_status = models.CharField(choices=attend_status_choice, max_length=10)
+    attend_status = models.CharField(choices=ATTEND_STATUS_CHOICES, max_length=10)
+
     created_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='eventmember_created_user')
     updated_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='eventmember_updated_user')
     created_date = models.DateField(auto_now_add=True)
     updated_date = models.DateField(auto_now_add=True)
-    status_choice = (
+
+    STATUS_CHOICES = (
         ('disabled', 'Disabled'),
         ('active', 'Active'),
         ('deleted', 'Deleted'),
         ('blocked', 'Blocked'),
         ('completed', 'Completed'),
     )
-    status = models.CharField(choices=status_choice, max_length=10)
-
+    status = models.CharField(choices=STATUS_CHOICES, max_length=10)
 
     class Meta:
         unique_together = ['event', 'user']
 
     def __str__(self):
         return str(self.user)
-    
+
     def get_absolute_url(self):
         return reverse('join-event-list')
 
@@ -150,58 +168,52 @@ class EventUserWishList(models.Model):
     updated_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='eventwishlist_updated_user')
     created_date = models.DateField(auto_now_add=True)
     updated_date = models.DateField(auto_now_add=True)
-    status_choice = (
+
+    STATUS_CHOICES = (
         ('disabled', 'Disabled'),
         ('active', 'Active'),
         ('deleted', 'Deleted'),
         ('blocked', 'Blocked'),
         ('completed', 'Completed'),
     )
-    status = models.CharField(choices=status_choice, max_length=10)
-
+    status = models.CharField(choices=STATUS_CHOICES, max_length=10)
 
     class Meta:
         unique_together = ['event', 'user']
 
     def __str__(self):
         return str(self.event)
-    
+
     def get_absolute_url(self):
         return reverse('event-wish-list')
 
 
 class UserCoin(models.Model):
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
-    CHOICE_GAIN_TYPE = (
+    
+    GAIN_TYPE_CHOICES = (
         ('event', 'Event'),
         ('others', 'Others'),
     )
-    gain_type = models.CharField(max_length=6, choices=CHOICE_GAIN_TYPE)
+    gain_type = models.CharField(max_length=6, choices=GAIN_TYPE_CHOICES)
     gain_coin = models.PositiveIntegerField()
+
     created_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='usercoin_created_user')
     updated_user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='usercoin_updated_user')
     created_date = models.DateField(auto_now_add=True)
     updated_date = models.DateField(auto_now_add=True)
-    status_choice = (
+
+    STATUS_CHOICES = (
         ('disabled', 'Disabled'),
         ('active', 'Active'),
         ('deleted', 'Deleted'),
         ('blocked', 'Blocked'),
         ('completed', 'Completed'),
     )
-    status = models.CharField(choices=status_choice, max_length=10)
+    status = models.CharField(choices=STATUS_CHOICES, max_length=10)
 
     def __str__(self):
         return str(self.user)
-    
+
     def get_absolute_url(self):
         return reverse('user-mark')
-
-
-
-
-
-
-
-
-
